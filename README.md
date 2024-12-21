@@ -14,7 +14,7 @@ Toty is a secure command-line TOTP (Time-based One-Time Password) generator and 
 ## Installation
 
 ```bash
-pip install git+https://github.com/yourusername/toty.git
+pip install git+https://github.com/H4R335HR/toty.git
 ```
 
 ## Configuration
