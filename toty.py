@@ -6,6 +6,9 @@ import base64
 import struct
 import time
 import sqlite3
+from rich.console import Console
+from rich.table import Table
+from rich import box
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -113,7 +116,8 @@ class SecureTotp:
     def list_tokens(self):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute('''
-                SELECT nickname, issuer, comments, type, last_used 
+                SELECT nickname, issuer, comments, type, 
+                    datetime(last_used, 'localtime') as last_used 
                 FROM tokens 
                 ORDER BY nickname
             ''')
@@ -175,14 +179,30 @@ def main():
             tokens = totp.list_tokens()
             if not tokens:
                 print("No tokens stored.")
-            for token in tokens:
-                nickname, issuer, comments, token_type, last_used = token
-                print(f"Nickname: {nickname}")
-                print(f"Issuer: {issuer or 'N/A'}")
-                print(f"Comments: {comments or 'N/A'}")
-                print(f"Type: {token_type}")
-                print(f"Last Used: {last_used}")
-                print("-" * 30)
+            else:
+                # Create a rich table
+                table = Table(title="Stored TOTP Tokens", box=box.DOUBLE_EDGE)
+                
+                # Add columns with styling
+                table.add_column("Nickname", style="cyan", no_wrap=True)
+                table.add_column("Issuer", style="magenta")
+                table.add_column("Comments", style="green")
+                table.add_column("Type", style="yellow")
+                table.add_column("Last Used", style="blue")
+
+                # Add rows
+                for token in tokens:
+                    table.add_row(
+                        str(token[0] or 'N/A'),  # nickname
+                        str(token[1] or 'N/A'),  # issuer
+                        str(token[2] or 'N/A'),  # comments
+                        str(token[3] or 'N/A'),  # type
+                        str(token[4] or 'N/A')   # last_used
+                    )
+
+                # Create console and print table
+                console = Console()
+                console.print(table)
         elif args.delete:
             totp.delete_token(args.nickname)
             print(f"Successfully deleted token for {args.nickname}")
