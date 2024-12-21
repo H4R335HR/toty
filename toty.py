@@ -11,36 +11,23 @@ CONFIG_PATH = Path.home() / '.toty' / 'secrets'
 
 def get_hotp_token(secret, intervals_no):
     """Generate HOTP token"""
-    # Decode base32 secret
     try:
         key = base64.b32decode(secret.upper(), casefold=True)
     except Exception:
         raise ValueError("Invalid base32 secret format")
     
-    # Pack intervals_no into 8-byte string
     msg = struct.pack(">Q", intervals_no)
-    
-    # Calculate HMAC-SHA1
     h = hmac.new(key, msg, hashlib.sha1).digest()
-    
-    # Get offset
     offset = h[-1] & 0xf
-    
-    # Generate 4-byte code
     code = ((h[offset] & 0x7f) << 24 |
             (h[offset + 1] & 0xff) << 16 |
             (h[offset + 2] & 0xff) << 8 |
             (h[offset + 3] & 0xff))
-    
-    # Modulus to get 6 digits
     code = code % 1000000
-    
-    # Zero-pad if necessary
     return '{:06d}'.format(code)
 
 def get_totp_token(secret):
     """Generate TOTP token"""
-    # Get current timestamp and calculate number of 30-second intervals
     intervals_no = int(time.time()) // 30
     return get_hotp_token(secret, intervals_no)
 
@@ -48,22 +35,12 @@ def setup_config():
     """Ensure config directory exists"""
     CONFIG_PATH.parent.mkdir(exist_ok=True)
     if not CONFIG_PATH.exists():
-        CONFIG_PATH.touch(mode=0o600)  # Create file with restricted permissions
+        CONFIG_PATH.touch(mode=0o600)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='TOTP generator')
-    subparsers = parser.add_subparsers(dest='command')
-
-    # Register command
-    register_parser = subparsers.add_parser('register', help='Register a new secret token')
-    register_parser.add_argument('-n', '--nickname', required=True, help='Nickname to store the secret token')
-    register_parser.add_argument('-s', '--secret-token', required=True, help='Secret token to store')
-
-    # Generate command
-    generate_parser = subparsers.add_parser('generate', help='Generate TOTP token for a registered nickname')
-    generate_parser.add_argument('-n', '--nickname', required=True, help='Nickname to retrieve the secret token from')
-
-    parser.set_defaults(command=None)
+    parser.add_argument('nickname', help='Nickname for the TOTP token')
+    parser.add_argument('-s', '--secret', help='Secret token to store (if registering)')
     return parser.parse_args()
 
 def register(nickname, secret_token):
@@ -95,23 +72,21 @@ def generate(nickname):
         print(f'Error generating token: {str(e)}')
         return None
 
-    print(f'Nickname "{nickname}" not found. Please register it first using the register command.')
+    print(f'Nickname "{nickname}" not found. Please register it first using: {sys.argv[0]} {nickname} -s <SECRET>')
     return None
 
 def main():
-    # Ensure config directory exists
     setup_config()
-    
     args = parse_args()
 
-    if args.command == 'register':
-        register(args.nickname, args.secret_token)
-    elif args.command == 'generate':
+    if args.secret:
+        # If secret is provided, we're registering
+        register(args.nickname, args.secret)
+    else:
+        # If no secret, we're generating
         token = generate(args.nickname)
         if token:
             print(token)
-    else:
-        print("Please specify a command. Use -h for help.")
 
 if __name__ == "__main__":
     main()
