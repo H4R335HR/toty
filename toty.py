@@ -55,7 +55,9 @@ class SecureTotp:
 
     def initialize(self, master_password=None):
         if master_password is None:
-            master_password = getpass.getpass("Enter master password: ")
+            master_password = os.environ.get('TOTY_MASTER')
+            if not master_password:
+                master_password = getpass.getpass("Enter master password: ")
         self.master_password = master_password
         self.fernet = Fernet(self._derive_key(master_password))
         self._init_db()
@@ -81,6 +83,11 @@ class SecureTotp:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ''', (nickname, encrypted, issuer, comments, type, 
                   hash_function, period, digits))
+
+    def token_exists(self, nickname):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute('SELECT 1 FROM tokens WHERE nickname = ?', (nickname,))
+            return cursor.fetchone() is not None
 
     def get_token(self, nickname):
         if not self.fernet:
@@ -163,8 +170,8 @@ def parse_args():
                        help='Token refresh period in seconds (default: 30)')
     parser.add_argument('-d', '--digits', type=int, default=6, 
                        help='Number of digits in generated token (default: 6)')
-    parser.add_argument('-l','--list', action='store_true', help='List all stored tokens')
-    parser.add_argument('-D','--delete', action='store_true', help='Delete the specified token')
+    parser.add_argument('-l', '--list', action='store_true', help='List all stored tokens')
+    parser.add_argument('-D', '--delete', action='store_true', help='Delete the specified token')
     
     return parser.parse_args()
 
@@ -207,6 +214,11 @@ def main():
             totp.delete_token(args.nickname)
             print(f"Successfully deleted token for {args.nickname}")
         elif args.secret:
+            if totp.token_exists(args.nickname):
+                confirmation = input(f"Token with nickname '{args.nickname}' already exists. Do you want to overwrite it? (y/N): ")
+                if confirmation.lower() != 'y':
+                    print("Operation cancelled")
+                    return
             # Register new token
             totp.store_token(
                 args.nickname, 
