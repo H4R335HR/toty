@@ -14,6 +14,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import getpass
 import os
+import pyperclip
+
 
 class SecureTotp:
     def __init__(self, db_path='~/.config/toty/main.db'):
@@ -130,6 +132,7 @@ class SecureTotp:
             ''')
             return cursor.fetchall()
 
+
 def get_hotp_token(secret, intervals_no, digits=6):
     """Generate HOTP token"""
     try:
@@ -147,10 +150,20 @@ def get_hotp_token(secret, intervals_no, digits=6):
     code = code % (10 ** digits)
     return '{:0{width}d}'.format(code, width=digits)
 
+
 def get_totp_token(secret, period=30, digits=6):
     """Generate TOTP token"""
     intervals_no = int(time.time()) // period
     return get_hotp_token(secret, intervals_no, digits)
+
+
+def copy_to_clipboard(text):
+    try:
+        pyperclip.copy(text)
+        return True
+    except Exception:
+        return False
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Secure TOTP generator')
@@ -174,6 +187,7 @@ def parse_args():
     parser.add_argument('-D', '--delete', action='store_true', help='Delete the specified token')
     
     return parser.parse_args()
+
 
 def main():
     args = parse_args()
@@ -200,26 +214,27 @@ def main():
                 # Add rows
                 for token in tokens:
                     table.add_row(
-                        str(token[0] or 'N/A'),  # nickname
-                        str(token[1] or 'N/A'),  # issuer
-                        str(token[2] or 'N/A'),  # comments
-                        str(token[3] or 'N/A'),  # type
-                        str(token[4] or 'N/A')   # last_used
+                        str(token[0] or 'N/A'),
+                        str(token[1] or 'N/A'),
+                        str(token[2] or 'N/A'),
+                        str(token[3] or 'N/A'),
+                        str(token[4] or 'N/A')
                     )
 
-                # Create console and print table
                 console = Console()
                 console.print(table)
+
         elif args.delete:
             totp.delete_token(args.nickname)
             print(f"Successfully deleted token for {args.nickname}")
+
         elif args.secret:
             if totp.token_exists(args.nickname):
                 confirmation = input(f"Token with nickname '{args.nickname}' already exists. Do you want to overwrite it? (y/N): ")
                 if confirmation.lower() != 'y':
                     print("Operation cancelled")
                     return
-            # Register new token
+
             totp.store_token(
                 args.nickname, 
                 args.secret,
@@ -231,13 +246,20 @@ def main():
                 digits=args.digits
             )
             print(f"Successfully stored token for {args.nickname}")
+
         else:
-            # Generate token
+            # Generate token and copy to clipboard
             token = totp.get_token(args.nickname)
             print(token)
-            
+
+            if copy_to_clipboard(token):
+                print("Copied to clipboard.")
+            else:
+                print("Could not copy to clipboard.")
+
     except Exception as e:
         print(f"Error: {str(e)}")
+
 
 if __name__ == "__main__":
     main()
