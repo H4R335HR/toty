@@ -6,6 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "rich",
+        "pyperclip",
         "cryptography"
     ],
     entry_points={
